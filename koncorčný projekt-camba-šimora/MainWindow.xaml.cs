@@ -1,5 +1,6 @@
-﻿using System;
-using System.Windows;
+﻿using System.Windows;
+using koncorcny_projekt_camba_simora;
+using koncorčný_projekt_camba_šimora.Services;
 
 namespace koncorčný_projekt_camba_šimora
 {
@@ -8,10 +9,20 @@ namespace koncorčný_projekt_camba_šimora
     /// </summary>
     public partial class MainWindow : Window
     {
+        private readonly UserStore _userStore = new();
+
         public MainWindow()
         {
             InitializeComponent();
             ShowLogin(); // default
+
+            // load remembered email
+            var remembered = _userStore.GetRememberedEmail();
+            if (!string.IsNullOrEmpty(remembered))
+            {
+                LoginEmail.Text = remembered;
+                RememberMe.IsChecked = true;
+            }
         }
 
         private void ShowLogin()
@@ -51,8 +62,35 @@ namespace koncorčný_projekt_camba_šimora
                 return;
             }
 
-            // TODO: Replace with real authentication
-            MessageBox.Show($"Welcome back, {email}!", "Signed in", MessageBoxButton.OK, MessageBoxImage.Information);
+            // Ensure email contains '@'
+            if (!email.Contains('@'))
+            {
+                MessageBox.Show("Please enter a valid email address containing '@'.", "Invalid email", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (!_userStore.Authenticate(email, pw, out var userName))
+            {
+                MessageBox.Show("Invalid email or password.", "Authentication failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            // remember preference
+            if (RememberMe.IsChecked == true)
+                _userStore.RememberEmail(email);
+            else
+                _userStore.RememberEmail(null);
+
+            // Open dashboard window and hide main while dashboard is open
+            DashboardWindow dashboardWindow = new(string.IsNullOrEmpty(userName) ? email : userName)
+            {
+                Owner = this
+            };
+            DashboardWindow dashboard = dashboardWindow;
+
+            Hide();
+            dashboard.ShowDialog();
+            Show();
         }
 
         private void Register_Click(object sender, RoutedEventArgs e)
@@ -68,14 +106,28 @@ namespace koncorčný_projekt_camba_šimora
                 return;
             }
 
+            // Ensure email contains '@'
+            if (!email.Contains('@'))
+            {
+                MessageBox.Show("Please enter a valid email address containing '@'.", "Invalid email", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             if (pw != confirm)
             {
                 MessageBox.Show("Passwords do not match.", "Validation error", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
-            // TODO: Replace with real registration logic (save user, validate email, etc.)
+            if (!_userStore.CreateUser(name, email, pw, out var error))
+            {
+                MessageBox.Show(error, "Registration error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
             MessageBox.Show("Account created successfully. You can now sign in.", "Registered", MessageBoxButton.OK, MessageBoxImage.Information);
+            // pre-fill login email
+            LoginEmail.Text = email;
             ShowLogin();
         }
     }
