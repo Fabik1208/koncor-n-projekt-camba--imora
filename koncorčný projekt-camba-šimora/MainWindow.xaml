@@ -132,7 +132,7 @@
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,10">
                                     <CheckBox x:Name="RememberMe" Content="Remember me" Foreground="#6B7280"/>
                                     <TextBlock Text=" " Width="12"/>
-                                    <TextBlock Foreground="#4F46E5" Cursor="Hand" TextDecorations="Underline" VerticalAlignment="Center">Forgot?</TextBlock>
+                                    
                                 </StackPanel>
 
                                 <Button Content="Sign in" Click="Login_Click" Style="{StaticResource PrimaryButton}" Margin="0,12,0,8" />

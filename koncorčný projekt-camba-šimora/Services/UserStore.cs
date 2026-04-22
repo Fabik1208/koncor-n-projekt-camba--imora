@@ -1,138 +1,90 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text.Json;
 
 namespace koncorèný_projekt_camba_šimora.Services
 {
-    public class UserRecord
-    {
-        public string Name { get; set; } = "";
-        public string Email { get; set; } = "";
-        public string PasswordHash { get; set; } = "";
-        public string Salt { get; set; } = "";
-    }
-
     public class UserStore
     {
-        private readonly string _dataDir;
-        private readonly string _userFile;
-        private readonly string _rememberFile;
+        // Súbory sa uložia ved¾a .exe súboru
+        private readonly string _usersFile = "users.txt";
+        private readonly string _rememberFile = "remember.txt";
 
-        public UserStore()
-        {
-            _dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TodoListApp");
-            Directory.CreateDirectory(_dataDir);
-            _userFile = Path.Combine(_dataDir, "users.json");
-            _rememberFile = Path.Combine(_dataDir, "remember.json");
-        }
-
-        private List<UserRecord> LoadUsers()
-        {
-            if (!File.Exists(_userFile))
-                return new List<UserRecord>();
-
-            var json = File.ReadAllText(_userFile);
-            try
-            {
-                return JsonSerializer.Deserialize<List<UserRecord>>(json) ?? new List<UserRecord>();
-            }
-            catch
-            {
-                return new List<UserRecord>();
-            }
-        }
-
-        private void SaveUsers(List<UserRecord> users)
-        {
-            var json = JsonSerializer.Serialize(users, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(_userFile, json);
-        }
-
+        // ??? Registrácia ???????????????????????????????????????????????
         public bool CreateUser(string name, string email, string password, out string error)
         {
-            error = "";
-            email = email.Trim().ToLowerInvariant();
-            var users = LoadUsers();
+            email = email.ToLower();
 
-            if (users.Any(u => u.Email == email))
+            // Skontroluj, èi email už existuje
+            if (File.Exists(_usersFile))
             {
-                error = "An account with that email already exists.";
-                return false;
+                var existing = File.ReadAllLines(_usersFile)
+                    .Where(l => !string.IsNullOrWhiteSpace(l))
+                    .Select(l => l.Split('|'))
+                    .Any(p => p.Length >= 2 && p[1].Equals(email, StringComparison.OrdinalIgnoreCase));
+
+                if (existing)
+                {
+                    error = "An account with this email already exists.";
+                    return false;
+                }
             }
 
-            var salt = CreateSalt();
-            var hash = HashPassword(password, salt);
-
-            users.Add(new UserRecord
-            {
-                Name = name,
-                Email = email,
-                PasswordHash = Convert.ToBase64String(hash),
-                Salt = Convert.ToBase64String(salt)
-            });
-
-            SaveUsers(users);
+            // Ulož:  meno|email|heslo
+            File.AppendAllText(_usersFile, $"{name}|{email}|{password}{Environment.NewLine}");
+            error = string.Empty;
             return true;
         }
 
+        // ??? Prihlásenie ???????????????????????????????????????????????
         public bool Authenticate(string email, string password, out string userName)
         {
-            userName = "";
-            email = email.Trim().ToLowerInvariant();
-            var users = LoadUsers();
-            var user = users.FirstOrDefault(u => u.Email == email);
-            if (user == null) return false;
+            userName = string.Empty;
+            email = email.ToLower();
 
-            var salt = Convert.FromBase64String(user.Salt);
-            var expected = Convert.FromBase64String(user.PasswordHash);
-            var actual = HashPassword(password, salt);
+            if (!File.Exists(_usersFile))
+                return false;
 
-            var ok = CryptographicOperations.FixedTimeEquals(expected, actual);
-            if (ok) userName = user.Name;
-            return ok;
+            foreach (var line in File.ReadAllLines(_usersFile))
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                var parts = line.Split('|');
+                if (parts.Length < 3) continue;
+
+                string storedEmail = parts[1].Trim().ToLower();
+                string storedPassword = parts[2].Trim();
+
+                if (storedEmail == email && storedPassword == password)
+                {
+                    userName = parts[0].Trim(); // meno používate¾a
+                    return true;
+                }
+            }
+
+            return false;
         }
 
-        private static byte[] CreateSalt(int size = 16)
-        {
-            var salt = new byte[size];
-            using var rng = RandomNumberGenerator.Create();
-            rng.GetBytes(salt);
-            return salt;
-        }
-
-        private static byte[] HashPassword(string password, byte[] salt, int iterations = 100_000, int length = 32)
-        {
-            using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256);
-            return pbkdf2.GetBytes(length);
-        }
-
-        // Remember-me helpers (stores last email in a small json)
+        // ??? Zapamätanie emailu ????????????????????????????????????????
         public void RememberEmail(string? email)
         {
             if (string.IsNullOrEmpty(email))
             {
-                if (File.Exists(_rememberFile)) File.Delete(_rememberFile);
-                return;
+                if (File.Exists(_rememberFile))
+                    File.Delete(_rememberFile);
             }
-
-            var obj = new { email = email.Trim().ToLowerInvariant() };
-            File.WriteAllText(_rememberFile, JsonSerializer.Serialize(obj));
+            else
+            {
+                File.WriteAllText(_rememberFile, email);
+            }
         }
 
-        public string? GetRememberedEmail()
+        public string GetRememberedEmail()
         {
-            if (!File.Exists(_rememberFile)) return null;
-            try
-            {
-                var json = File.ReadAllText(_rememberFile);
-                var doc = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
-                if (doc != null && doc.TryGetValue("email", out var e)) return e;
-            }
-            catch { }
-            return null;
+            if (!File.Exists(_rememberFile))
+                return string.Empty;
+
+            return File.ReadAllText(_rememberFile).Trim();
         }
     }
 }
