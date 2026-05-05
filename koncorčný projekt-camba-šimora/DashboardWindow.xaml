@@ -6,7 +6,15 @@
         <StackPanel>
             <TextBlock x:Name="WelcomeText" FontSize="22" FontWeight="Bold" Margin="6"/>
             <TextBlock Text="This is a simple dashboard window opened after a successful login." Foreground="#6B7280" Margin="6"/>
-            <Button Content="Sign out" Width="110" Margin="6" HorizontalAlignment="Left" Click="SignOut_Click"/>
+
+            <!-- Replace StackPanel.Spacing with Button Margin for compatibility -->
+            <StackPanel Orientation="Horizontal" Margin="6" HorizontalAlignment="Left"                          >
+                <Button Content="Add Task" Width="100" Margin="0,0,8,0" Click="AddTask_Click"/>
+                <Button Content="Sign out" Width="110" Click="SignOut_Click"/>
+            </StackPanel>
+
+            <TextBlock Text="Tasks" FontWeight="Bold" Margin="6,12,6,6"/>
+            <ListBox x:Name="TaskList" Margin="6" Height="260"/>
         </StackPanel>
     </Grid>
 </Window>
